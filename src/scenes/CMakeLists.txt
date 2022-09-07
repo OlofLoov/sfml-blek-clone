@@ -7,6 +7,7 @@ target_sources(scenes
   PUBLIC
     ${CMAKE_CURRENT_LIST_DIR}/WormyScene.hpp
     ${CMAKE_CURRENT_LIST_DIR}/Scenes.hpp
+    ${CMAKE_CURRENT_LIST_DIR}/InputPosition.hpp
   )
 target_include_directories(scenes
   PUBLIC
@@ -16,4 +17,5 @@ target_include_directories(scenes
   target_link_libraries(scenes
     PRIVATE    
     game
+    entities
   )
