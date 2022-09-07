@@ -8,13 +8,7 @@ WormyScene::WormyScene(std::shared_ptr<sf::RenderWindow> window) {
 
 void WormyScene::initialize() {
     std::cout << "GameState::initialize" << std::endl;
-    m_moveDelta = sf::Vector2f();
-    m_deltaTime = 0.0f;
-
-    m_hasSetMoveParams = false;
-    m_hasCollided = false;
     m_isDirty = false;
-    m_drawPositions.clear();
     m_obstacles.clear();
     m_scorings.clear();
 
@@ -33,13 +27,14 @@ void WormyScene::initialize() {
     m_scorings.push_back(s1);
     m_scorings.push_back(s2);
     m_scorings.push_back(s3);
+
+    reset();
 }
 
 void WormyScene::reset() {
     m_drawPositions.clear();
     m_moveDelta = sf::Vector2f();
     m_deltaTime = 0.0f;
-
     m_hasSetMoveParams = false;
     m_hasCollided = false;
 
@@ -49,7 +44,6 @@ void WormyScene::reset() {
 
 void WormyScene::onEvent(sf::Event event) {
     if (sf::Mouse::isButtonPressed(sf::Mouse::Left)) {
-        
         auto mousePos = sf::Mouse::getPosition(*_window);
 
         if (!m_isDrawing && !m_hasCollided) {
@@ -69,11 +63,25 @@ void WormyScene::onEvent(sf::Event event) {
             // don't add same pos multiple times, will cause issues when determining distance between points
             if (!(mousePos.x == lastPos.x && mousePos.y == lastPos.y)) {
                 auto drawPosition = InputPosition(mousePos, m_clock.getElapsedTime());
-                m_drawPositions.emplace_back(drawPosition);            
+                m_drawPositions.push_back(drawPosition);            
             }  
         }
     } else {
-        m_isDrawing = false;
+        if (m_isDrawing) {
+            // once stopped drawing we reschedule the time positions
+            // thus we don't need to wait time_delay. 
+            // since we filter the array based on m_timeDelay we know that the oldest element is roughly m_timedelay
+            auto oldest = m_drawPositions.front();
+            auto minTime = m_clock.getElapsedTime() - sf::seconds(m_timeDelay);
+            auto dt = minTime.asSeconds() - oldest.timeStamp.asSeconds();
+
+            for(auto& dp : m_drawPositions) {
+                dp.timeStamp = dp.timeStamp + sf::seconds(dt);
+            }
+
+            m_isDrawing = false;
+        }
+        
         if (m_drawPositions.size() == 0 && m_isDirty) {
             reset();
         }
@@ -81,10 +89,23 @@ void WormyScene::onEvent(sf::Event event) {
 }
 
 void WormyScene::checkCollisions() {
+    if (m_hasCollided)
+        return;
+
+    if(m_drawPositions.size() == 0) {
+        return;
+    }
     auto lastPos = m_drawPositions.back().position;
+    auto positionsToCheck = m_line.getLatestVertices();
+    positionsToCheck.push_back(lastPos);
+
+    sf::Vector2f collisionPosition;
+
+    for(auto& p : positionsToCheck) {
         for(auto& obs : m_obstacles) {
-            if (obs.collides(lastPos)) {
+            if (obs.collides(p)) {
                 m_hasCollided = true;
+                collisionPosition = obs.getCenter();
                 break;
             }
         }
@@ -92,19 +113,27 @@ void WormyScene::checkCollisions() {
         // while drawing it is not allowed to collide with "score points"
         if(m_isDrawing) {
             for(auto& s : m_scorings) {
-                if (s.collides(lastPos)) {
+                if (s.collides(p)) {
                     m_hasCollided = true;
+                    collisionPosition = s.getCenter();
                     break;
                 }
             }
         } else { // check collisions when not drawing -> points!!
             for(auto& s : m_scorings) {
-                if (s.collides(lastPos)) {
+                if (s.collides(p)) {
                     s.take();          
                     break;
                 }
             }
         }
+    }
+
+    if (m_hasCollided) {
+        // avoid glitchy line rendering when colliding by addings new pos to center of collision obj 
+        auto drawPosition = InputPosition(collisionPosition, m_drawPositions.back().timeStamp + sf::milliseconds(100));
+        m_drawPositions.push_back(drawPosition);
+    }
 }
 
 void WormyScene::update(float deltaTime) {
@@ -117,20 +146,17 @@ void WormyScene::update(float deltaTime) {
     }
         
     if(m_isDrawing || m_hasCollided) {
-        // delete entrys older than 2s 
-        filterOldPositions(2.0f);
+        filterOldPositions(m_timeDelay);
     } else {
-
         std::deque<InputPosition> itemsToMove;
         std::deque<InputPosition> items;
-        auto currentTimeStamp = m_clock.getElapsedTime().asSeconds();
+        auto currentTimeStamp = m_clock.getElapsedTime();
         for(auto& v : m_drawPositions) {
-            auto timeStamp = v.timeStamp.asSeconds();
-            auto hasElapsed = currentTimeStamp - 2.0f > timeStamp;       
+            auto hasElapsed = currentTimeStamp - sf::seconds(m_timeDelay) > v.timeStamp;       
             if (hasElapsed) {
-                itemsToMove.emplace_back(v);
+                itemsToMove.push_back(v);
             } else {
-                items.emplace_back(v);
+                items.push_back(v);
             }
         }
 
@@ -168,7 +194,7 @@ void WormyScene::filterOldPositions(float time) {
     m_drawPositions.erase(std::remove_if(m_drawPositions.begin(), m_drawPositions.end(), 
                     [&](InputPosition dp) { 
                     auto timeStamp = dp.timeStamp.asSeconds();
-                    return currentTimeStamp - 2.0f > timeStamp;
+                    return currentTimeStamp - m_timeDelay > timeStamp;
     }), m_drawPositions.end());
 }
 

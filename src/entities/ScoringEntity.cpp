@@ -1,11 +1,20 @@
 #include "ScoringEntity.hpp"
 #include <iostream>
+#include <math.h>
 
 ScoringEntity::ScoringEntity(sf::Vector2f position) {
     m_shape.setFillColor(sf::Color::Green);
     m_shape.setRadius(25.f);
     m_shape.setPosition(position);
     m_scale = 1.0f;
+}
+
+sf::Vector2f ScoringEntity::getCenter() {
+    auto shapePos = m_shape.getPosition();
+    shapePos.x += m_shape.getRadius();
+    shapePos.y += m_shape.getRadius();
+
+    return shapePos;
 }
 
 void ScoringEntity::render(sf::RenderTarget& renderTarget) {
@@ -16,11 +25,6 @@ void ScoringEntity::reset() {
     m_scale = 1.0f;
     m_shape.setScale(sf::Vector2f(m_scale, m_scale));
     m_taken = false;
-
-    m_shape.setFillColor(sf::Color::Green);
-    m_shape.setRadius(25.f);
-
-    std::cout << "reset scoring" << std::endl;
 }
 
 void ScoringEntity::update(float deltaTime) {
@@ -31,9 +35,8 @@ void ScoringEntity::update(float deltaTime) {
     m_shape.scale(sf::Vector2f(m_scale, m_scale));
  }
 
-// using box colliding for circle. obv not optimal but it will do
-bool ScoringEntity::collides(sf::Vector2f pos) { 
-    return m_shape.getGlobalBounds().contains(pos);
+bool ScoringEntity::collides(sf::Vector2f pos) {
+    return m_collider.collides(pos, m_shape);
 }
 
 void ScoringEntity::take() {

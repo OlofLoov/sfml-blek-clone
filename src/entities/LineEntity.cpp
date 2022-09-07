@@ -1,14 +1,16 @@
 #include "LineEntity.hpp"
 #include <math.h>
 
-void LineEntity::update(const std::deque<InputPosition>& positions) {
+LineEntity::LineEntity() {
     m_line = sf::VertexArray();
-    m_line.setPrimitiveType(sf::PrimitiveType::TrianglesStrip);
+    m_line.setPrimitiveType(sf::PrimitiveType::TrianglesStrip);    
+}
+
+void LineEntity::update(const std::deque<InputPosition>& positions) {
     m_line.clear();
 
     sf::Vector2f p0;
     sf::Vector2f p1;
-
     float prevMag = 0.0f;
 
     for(int i = 1; i < positions.size(); i++) {
@@ -26,13 +28,13 @@ void LineEntity::update(const std::deque<InputPosition>& positions) {
         auto v_distance_normalized = sf::Vector2f(v_distance.x / distance, v_distance.y / distance);
         auto v_perpendicular = sf::Vector2f(-v_distance_normalized.y, v_distance_normalized.x);
 
-        // magnitude must be larger than 2.0
-        // must not differ more than 50% of prevMag
-        // must not be larger than 8
+        // magnitude must be larger than 5.0
+        // must not differ more than 10% of prevMag
+        // must not be larger than 15
 
-        float min = fmax(2.0, prevMag * 0.8f);
-        float max = fmin(10.0f, prevMag * 1.2f);
-        float magnitude = fmax(min, fmin(max, distance));
+        float minMag = fmax(5.0, prevMag * 0.9f);
+        float maxMag = fmin(15.0f, prevMag * 1.1f);
+        float magnitude = fmax(minMag, fmin(maxMag, distance));
 
         // if p0/p1 not initialized. only when i is 1. 
         if ( p0.x == 0 && p1.x == 0 && p0.y == 0 && p1.y == 0) { 
@@ -75,4 +77,14 @@ void LineEntity::update(const std::deque<InputPosition>& positions) {
 
 void LineEntity::render(sf::RenderTarget& renderTarget) {
     renderTarget.draw(m_line);
+}
+
+// used for detecting collisions
+std::vector<sf::Vector2f> LineEntity::getLatestVertices() {
+    if (m_line.getVertexCount() < 2)
+        return {};
+
+    auto secondLatest = m_line[m_line.getVertexCount() - 1];
+    auto latest = m_line[m_line.getVertexCount() - 2];
+    return {secondLatest.position, latest.position};
 }

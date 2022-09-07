@@ -49,4 +49,6 @@ class WormyScene: public IScene {
 
         void filterOldPositions(float time); // remove items that been in the array longer than time
         void reset();
+
+        const float m_timeDelay = 1.5f; // time before point is deleted/moved
 };
